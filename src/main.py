@@ -1,79 +1,53 @@
-#V2
 from machine import deepsleep
-from network import LoRa
-from network import WLAN
 from pycom import heartbeat
 from time import sleep
-import config
-import socket
-import ubinascii
-
+import ujson
 
 # Deactivate LED
 heartbeat(False)
 
-# Conf
-APP_EUI            = ubinascii.unhexlify(config.app_eui)
-APP_KEY            = ubinascii.unhexlify(config.app_key)
-LONG_SLEEP         = 600 #seconds
-SHORT_SLEEP        = 600 #seconds
-SCAN_TIME          = 5 #seconds
-TRANSMISSION_POWER = 8 #8-78, Defines wifi range. Transmission power divided by 4 equals decibel milliwatts.
+with open('settings.json') as f:
+    SETTINGS = ujson.loads(f.read())
 
-# Variables
-wlan            = WLAN(mode=WLAN.STA, antenna=WLAN.INT_ANT, max_tx_pwr=TRANSMISSION_POWER)
-lora            = LoRa(mode=LoRa.LORAWAN, region=LoRa.EU868)
-s               = socket.socket(socket.AF_LORA, socket.SOCK_RAW)
-mac_addresses   = set()
+DATA_RATE   = SETTINGS.get("data_rate", 0)
+TRANS_POWER = SETTINGS.get("trans_power", 8)
+SCAN_TIME   = SETTINGS.get("scan_time", 5000)
+SHORT_SLEEP = SETTINGS.get("short_sleep", 300000)
+LONG_SLEEP  = SETTINGS.get("long_sleep", 1200000)
 
-def lora_join():
-    '''Function for joining LoRa.'''
-    lora.nvram_restore()
-    if not lora.has_joined():
-        lora.join(activation=LoRa.OTAA, auth=(APP_EUI, APP_KEY), timeout=0)
+def update_settings(b=b'\x28\xcb'):
+    """Set the new settings and save to JSON file.
+    
+    Parameters:
+    b (short): The short (2 bytes) to extract setting parameters from.
+    """
+    global SETTINGS, DATA_RATE, TRANS_POWER, SCAN_TIME, SHORT_SLEEP, LONG_SLEEP
+    data_rate_values   = [0, 1, 2, 4, 5]
+    trans_power_values = [8, 12, 16, 20, 24, 28, 32, 36, 48, 78]
+    scan_time_values   = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    short_sleep_values = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    long_sleep_values  = [5, 10, 15, 20, 25, 30, 35, 40, 480, 600]
+    new_settings = [int(i) for i in str(int.from_bytes(b, 'big'))]
+    if len(new_settings) != 5:
+        new_settings = [1, 0, 4, 4, 3]
+    new_settings[0] = 1 if new_settings[0] < 1 else (5 if new_settings[0] > 5 else new_settings[0])
 
-    # Wait for the module to join the LoRa-network.
-    while not lora.has_joined():
-        sleep(2.5)
+    SETTINGS["data_rate"]   = DATA_RATE   = data_rate_values[(new_settings[0] - 1)]
+    SETTINGS["trans_power"] = TRANS_POWER = trans_power_values[new_settings[1]]
+    SETTINGS["scan_time"]   = SCAN_TIME   = scan_time_values[new_settings[2]] * 1000 
+    SETTINGS["short_sleep"] = SHORT_SLEEP = short_sleep_values[new_settings[3]] * 60000
+    SETTINGS["long_sleep"]  = LONG_SLEEP  = long_sleep_values[new_settings[4]] * 60000
+    with open('settings.json', 'w') as f:
+        f.write(ujson.dumps(SETTINGS))
 
-    # Set the LoRaWAN data rate
-    s.setsockopt(socket.SOL_LORA, socket.SO_DR, 0)
+update_settings(b'\xd9\x03')
+# update_settings()
 
-# Function for wifi-sniffer
-def wifi_sniffer(pack):
-    '''WiFi sniffer.'''
-    global mac_addresses
-    mac = bytearray(6)
-    pk = wlan.wifi_packet()
-    control = pk.data[0]
-    subtype = (0xF0 & control) >> 4
-    if subtype == 4: # 4 = probe request, 5 = probe response
-        for i in range (0,6):
-            mac[i] = pk.data[10 + i]
-        mac_addresses.add(ubinascii.hexlify(mac))
+print("DATA RATE: ", DATA_RATE)
+print("TRANS POW: ", TRANS_POWER)
+print("SCAN TIME: ", SCAN_TIME)
+print("SHORT SLEEP: ", SHORT_SLEEP)
+print("LONG SLEEP: ", LONG_SLEEP)
 
-def lora_send(val):
-    '''Send packet and set setblocking on and off.'''
-    s.setblocking(True)
-    s.send(bytes([val]))
-    s.setblocking(False)
-
-
-def d_sleep(s):
-    '''Deepsleep for given time. Save LoRa first.'''
-    lora.nvram_save()
-    deepsleep(s * 1000)
-
-# Sniff for WiFi. Sleep to give it some time.
-wlan.callback(trigger=WLAN.EVENT_PKT_MGMT, handler=wifi_sniffer)
-wlan.promiscuous(True)
-sleep(SCAN_TIME)
-wlan.promiscuous(False)
-wlan.deinit()
-
-lora_join()
-lora_send(len(mac_addresses))
-
-if mac_addresses:
-    d_sleep(SHORT_SLEEP)
-d_sleep(LONG_SLEEP)
+print()
+print(SETTINGS)
