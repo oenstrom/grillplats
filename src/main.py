@@ -13,14 +13,15 @@ import ubinascii
 heartbeat(False)
 
 # Conf
-APP_EUI         = ubinascii.unhexlify(config.app_eui)
-APP_KEY         = ubinascii.unhexlify(config.app_key)
-LONG_SLEEP      = 600 #seconds
-SHORT_SLEEP     = 600 #seconds
-SCAN_TIME       = 5
+APP_EUI            = ubinascii.unhexlify(config.app_eui)
+APP_KEY            = ubinascii.unhexlify(config.app_key)
+LONG_SLEEP         = 600 #seconds
+SHORT_SLEEP        = 600 #seconds
+SCAN_TIME          = 5 #seconds
+TRANSMISSION_POWER = 8 #8-78, Defines wifi range. Transmission power divided by 4 equals decibel milliwatts.
 
 # Variables
-wlan            = WLAN(mode=WLAN.STA, antenna=WLAN.INT_ANT)
+wlan            = WLAN(mode=WLAN.STA, antenna=WLAN.INT_ANT, max_tx_pwr=TRANSMISSION_POWER)
 lora            = LoRa(mode=LoRa.LORAWAN, region=LoRa.EU868)
 s               = socket.socket(socket.AF_LORA, socket.SOCK_RAW)
 mac_addresses   = set()
