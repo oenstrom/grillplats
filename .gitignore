@@ -1,6 +1,11 @@
 
+<<<<<<< HEAD
 # Created by https://www.toptal.com/developers/gitignore/api/python,visualstudiocode,linux,macos,windows
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,visualstudiocode,linux,macos,windows
+=======
+# Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,python,linux,macos
+# Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,python,linux,macos
+>>>>>>> b76e6f0761904000d83acbfc534602566b2d1755
 
 ### Linux ###
 *~
@@ -197,6 +202,7 @@ dmypy.json
 .history
 .ionide
 
+<<<<<<< HEAD
 ### Windows ###
 # Windows thumbnail cache files
 Thumbs.db
@@ -227,3 +233,9 @@ $RECYCLE.BIN/
 config.py
 
 # End of https://www.toptal.com/developers/gitignore/api/python,visualstudiocode,linux,macos,windows
+=======
+pymakr.conf
+src/config.py
+
+# End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,python,linux,macos
+>>>>>>> b76e6f0761904000d83acbfc534602566b2d1755
