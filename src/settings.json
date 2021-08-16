@@ -1,1 +1,1 @@
-{"trans_power": 28, "short_sleep": 360000, "long_sleep": 1800000, "data_rate": 5, "scan_time": 6000}
+{"rssi": 8, "short_sleep": 3000000, "long_sleep": 9000000, "data_rate": 5, "scan_time": 10000}

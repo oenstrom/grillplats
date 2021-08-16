@@ -1,7 +1,7 @@
 from machine import deepsleep
 from network import LoRa
 from network import WLAN
-from time import sleep
+from time import sleep_ms
 import config
 import socket
 import ubinascii
@@ -11,28 +11,28 @@ with open('settings.json') as f:
     SETTINGS = ujson.loads(f.read())
 
 DATA_RATE   = SETTINGS.get("data_rate", 0)
-TRANS_POWER = SETTINGS.get("trans_power", 8) # 8-78, Defines wifi range. Transmission power divided by 4 equals decibel milliwatts.
-SCAN_TIME   = SETTINGS.get("scan_time", 5000)
-SHORT_SLEEP = SETTINGS.get("short_sleep", 300000)
-LONG_SLEEP  = SETTINGS.get("long_sleep", 1200000)
+RSSI        = SETTINGS.get("rssi", -70)
+SCAN_TIME   = SETTINGS.get("scan_time", 10000)
+SHORT_SLEEP = SETTINGS.get("short_sleep", 3000000)
+LONG_SLEEP  = SETTINGS.get("long_sleep", 9000000)
 
 APP_EUI         = ubinascii.unhexlify(config.app_eui)
 APP_KEY         = ubinascii.unhexlify(config.app_key)
 
-wlan            = WLAN(mode=WLAN.STA, antenna=WLAN.INT_ANT, max_tx_pwr=TRANS_POWER)
+wlan            = WLAN(mode=WLAN.STA, antenna=WLAN.INT_ANT)
 lora            = LoRa(mode=LoRa.LORAWAN, region=LoRa.EU868)
 s               = socket.socket(socket.AF_LORA, socket.SOCK_RAW)
 mac_addresses   = set()
 
-def update_settings(b=b'\x28\xcb'):
+def update_settings_light(b=b'\x28\xcb'):
     """Set the new settings and save to JSON file.
 
     Parameters:
     b (short): The short (2 bytes) to extract setting parameters from.
     """
-    global SETTINGS, DATA_RATE, TRANS_POWER, SCAN_TIME, SHORT_SLEEP, LONG_SLEEP
+    global SETTINGS, DATA_RATE, RSSI, SCAN_TIME, SHORT_SLEEP, LONG_SLEEP
     data_rate_values   = [0, 1, 2, 4, 5]
-    trans_power_values = [8, 12, 16, 20, 24, 28, 32, 36, 48, 78]
+    rssi               = [-60, -70, -80, -90]
     scan_time_values   = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     short_sleep_values = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     long_sleep_values  = [5, 10, 15, 20, 25, 30, 35, 40, 480, 600]
@@ -42,7 +42,7 @@ def update_settings(b=b'\x28\xcb'):
     new_settings[0] = 1 if new_settings[0] < 1 else (5 if new_settings[0] > 5 else new_settings[0])
 
     SETTINGS["data_rate"]   = DATA_RATE   = data_rate_values[(new_settings[0] - 1)]
-    SETTINGS["trans_power"] = TRANS_POWER = trans_power_values[new_settings[1]]
+    SETTINGS["rssi"]        = RSSI        = rssi[new_settings[1]]
     SETTINGS["scan_time"]   = SCAN_TIME   = scan_time_values[new_settings[2]] * 1000
     SETTINGS["short_sleep"] = SHORT_SLEEP = short_sleep_values[new_settings[3]] * 60000
     SETTINGS["long_sleep"]  = LONG_SLEEP  = long_sleep_values[new_settings[4]] * 60000
@@ -57,7 +57,7 @@ def lora_join():
 
     # Wait for the module to join the LoRa-network.
     while not lora.has_joined():
-        sleep(2.5)
+        sleep_ms(2.5)
 
     # Set the LoRaWAN data rate
     s.setsockopt(socket.SOL_LORA, socket.SO_DR, DATA_RATE)
@@ -72,7 +72,8 @@ def wifi_sniffer(pack):
     if subtype == 4: # 4 = probe request, 5 = probe response
         for i in range (0,6):
             mac[i] = pk.data[10 + i]
-        mac_addresses.add(ubinascii.hexlify(mac))
+        if pk.rssi > RSSI:
+            mac_addresses.add(ubinascii.hexlify(mac))
 
 def lora_send(val):
     '''Send packet and set setblocking on and off.'''
@@ -88,17 +89,17 @@ def d_sleep(ms):
 # Sniff for WiFi. Sleep to give it some time.
 wlan.callback(trigger=WLAN.EVENT_PKT_MGMT, handler=wifi_sniffer)
 wlan.promiscuous(True)
-sleep(SCAN_TIME)
+sleep_ms(SCAN_TIME)
 wlan.promiscuous(False)
 wlan.deinit()
 
 lora_join()
 lora_send(len(mac_addresses))
 
-# TODO: Update settings using downlinks.
-# data = s.recv(64)
-# if data:
-#     update_settings(data)
+# TODO: Update settings via downlinks
+# downlink = s.recv(64)
+# if downlink:
+#     print(downlink.decode("utf-8"))
 
 if mac_addresses:
     d_sleep(SHORT_SLEEP)
